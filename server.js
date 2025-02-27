@@ -8,7 +8,7 @@ const app = express(); // יוצרים שרת חדש
 
 // מחברים את מסד הנתונים
 connectDB();
-
+const x =1
 // הוספת middleware לlogging
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`.cyan);
