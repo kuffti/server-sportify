@@ -2,42 +2,38 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
+// קבע מפתח ברירת מחדל
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+
 const register = async (req, res) => {
   try {
-    console.log('Registration request body:', req.body);
     const { name, email, password } = req.body;
+    console.log('בקשת הרשמה:', { name, email, passwordLength: password?.length });
 
+    // בדיקות תקינות פשוטות
     if (!name || !email || !password) {
-      console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
-      return res.status(400).json({ 
-        message: 'כל השדות הם חובה',
-        details: 'חסרים שדות נדרשים'
-      });
+      return res.status(400).json({ message: 'כל השדות הם חובה' });
     }
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      console.log('User already exists with email:', email);
-      return res.status(400).json({ 
-        message: 'משתמש קיים',
-        details: 'כתובת האימייל כבר רשומה במערכת'
-      });
+    // בדיקה אם המשתמש כבר קיים
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'משתמש עם אימייל זה כבר קיים' });
     }
 
-    const user = new User({
+    // יצירת משתמש חדש
+    const user = await User.create({
       name,
       email,
       password
     });
 
-    await user.save();
-    console.log('User created successfully:', user._id);
+    console.log('משתמש נוצר בהצלחה:', user._id);
 
-    const token = jwt.sign(
-      { id: user._id }, 
-      process.env.JWT_SECRET || 'fallback_secret',
-      { expiresIn: '30d' }
-    );
+    // יצירת טוקן
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: '30d'
+    });
 
     res.status(201).json({
       _id: user._id,
@@ -46,38 +42,72 @@ const register = async (req, res) => {
       isAdmin: user.isAdmin,
       token
     });
-
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(400).json({ 
-      message: 'שגיאה בהרשמה',
-      details: error.message
-    });
+    console.error('שגיאה בהרשמה:', error);
+    res.status(500).json({ message: 'שגיאת שרת בהרשמה', details: error.message });
   }
 };
 
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    console.log('בקשת התחברות:', { email, passwordProvided: !!password });
 
-    if (user && (await user.matchPassword(password))) {
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-        expiresIn: '30d'
+    // בדיקות תקינות
+    if (!email || !password) {
+      return res.status(400).json({ 
+        message: 'אנא הזן אימייל וסיסמה',
+        details: 'חסרים פרטי התחברות' 
       });
-
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin,
-        token
-      });
-    } else {
-      res.status(401).json({ message: 'אימייל או סיסמה לא נכונים' });
     }
+
+    // חיפוש המשתמש לפי אימייל
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      console.log(`משתמש לא נמצא: ${email}`);
+      // חשוב: מסיבות אבטחה לא לציין שהאימייל לא נמצא אלא לתת הודעה כללית
+      return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+    }
+
+    // בדיקה אם הסיסמה בכלל קיימת
+    if (!user.password) {
+      console.log(`סיסמה חסרה למשתמש: ${email}`);
+      return res.status(401).json({ message: 'שגיאת אימות, פנה למנהל המערכת' });
+    }
+
+    // בדיקת סיסמה
+    const isMatch = await user.matchPassword(password);
+    console.log('סיסמה תואמת:', isMatch ? 'כן' : 'לא');
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+    }
+
+    // יצירת טוקן
+    const token = jwt.sign(
+      { id: user._id }, 
+      process.env.JWT_SECRET || 'default_secret',
+      { expiresIn: '30d' }
+    );
+
+    // שולח תשובה עם נתוני המשתמש (ללא סיסמה)
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      token
+    });
+    
+    console.log('התחברות מוצלחת:', user.email);
+    
   } catch (error) {
-    res.status(400).json({ message: 'שגיאה בהתחברות', error: error.message });
+    console.error('שגיאה בהתחברות:', error);
+    res.status(500).json({ 
+      message: 'שגיאת שרת בהתחברות', 
+      details: error.message 
+    });
   }
 };
 

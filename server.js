@@ -33,6 +33,7 @@ app.use(cors({
 // הגדרת הנתיבים הראשיים
 app.use('/api/users', require('./routes/userRoutes')); // שינוי הנתיב
 app.use('/api/posts', require('./routes/postRoutes')); // שינוי הנתיב
+app.use('/api/tips', require('./routes/tipRoutes')); // הוספת נתיב הטיפים
 
 // הוספת נתיב בדיקה פשוט
 app.get('/api/test', (req, res) => {
