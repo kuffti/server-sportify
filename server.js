@@ -33,6 +33,7 @@ app.use(cors({
 // הגדרת הנתיבים הראשיים
 app.use('/api/users', require('./routes/userRoutes')); // שינוי הנתיב
 app.use('/api/posts', require('./routes/postRoutes')); // שינוי הנתיב
+app.use('/api/tips', require('./routes/tipRoutes')); // הוספת נתיב הטיפים
 
 // הוספת נתיב בדיקה פשוט
 app.get('/api/test', (req, res) => {
@@ -67,6 +68,17 @@ function printRoutes(stack, basePath = '') {
 
 // הדפסה מפורטת יותר של הנתיבים
 printRoutes(app._router.stack);
+
+// להדפיס מידע על הנתיבים כדי לוודא שהוגדרו נכון
+console.log('===== נתיבי משתמשים =====');
+const userRoutes = require('./routes/userRoutes');
+userRoutes.stack.forEach((layer) => {
+  if (layer.route) {
+    const path = layer.route.path;
+    const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+    console.log(`${methods} /api/users${path}`);
+  }
+});
 
 // הוספת endpoint לבדיקת נתיבים
 app.get('/api/routes', (req, res) => {

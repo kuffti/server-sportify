@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// נגדיר סכמה חדשה לחלוטין ללא שום זכר לשדה username
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -19,37 +18,65 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'נא להזין סיסמה'],
-    minlength: [6, 'הסיסמה חייבת להכיל לפחות 6 תווים']
+    minlength: [6, 'הסיסמה חייבת להכיל לפחות 6 תווים'],
+    select: true // וודא שהסיסמה מגיעה בשאילתות
   },
   isAdmin: {
     type: Boolean,
-    default: false // ברירת המחדל היא משתמש רגיל, לא אדמין
+    default: false
   }
 }, {
-  timestamps: true,
-  strict: true // מגדיר שרק השדות המוגדרים מעלה יכולים להיות בקולקציה
+  timestamps: true
 });
 
-// הצפנת סיסמה לפני שמירה
+// פונקציה להצפנת סיסמה
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
+  try {
+    // רק אם הסיסמה השתנתה
+    if (!this.isModified('password')) {
+      return next();
+    }
+    
+    console.log('מצפין סיסמה למשתמש:', this.email);
+    
+    // הצפנת הסיסמה עם bcrypt
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    
+    next();
+  } catch (error) {
+    console.error('שגיאה בהצפנת סיסמה:', error);
+    next(error);
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
-// מתודה להשוואת סיסמאות
+// פונקציה משופרת להשוואת סיסמאות
 userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  try {
+    // לוג לפני השוואה
+    console.log('משווה סיסמה למשתמש:', this.email);
+    
+    // אם אין סיסמה או שהיא לא מוצפנת כראוי, מחזיר שקר
+    if (!this.password || !this.password.startsWith('$2')) {
+      console.log('סיסמה חסרה או לא מוצפנת כראוי');
+      return false;
+    }
+    
+    // השוואה עם bcrypt
+    const isMatch = await bcrypt.compare(enteredPassword, this.password);
+    console.log('תוצאת השוואה:', isMatch ? 'תואם' : 'לא תואם');
+    return isMatch;
+  } catch (error) {
+    console.error('שגיאה בהשוואת סיסמאות:', error);
+    return false;
+  }
 };
 
-// מחיקת הדגם הישן אם קיים
+// מחיקת המודל הקיים (אם יש כזה)
 try {
   mongoose.deleteModel('User');
-} catch (e) {
-  // אם הדגם לא קיים, נמשיך
+} catch (error) {
+  // התעלם מהשגיאה - זה קורה אם המודל לא קיים עדיין
 }
 
 const User = mongoose.model('User', userSchema);
