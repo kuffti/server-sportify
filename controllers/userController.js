@@ -111,7 +111,58 @@ const login = async (req, res) => {
   }
 };
 
+// פונקציה לעדכון פרופיל משתמש
+const updateProfile = async (req, res) => {
+  try {
+    // מתוך מידלוור ההגנה, יש לנו את המשתמש בבקשה
+    const userId = req.user._id;
+    const { name, email } = req.body;
+    
+    console.log(`בקשה לעדכון פרופיל עבור משתמש ${userId}:`, { name, email });
+
+    // בדיקות תקינות
+    if (!name) {
+      return res.status(400).json({ message: 'שם הוא שדה חובה' });
+    }
+    
+    // בדיקה אם האימייל החדש כבר קיים למשתמש אחר
+    if (email && email !== req.user.email) {
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'כתובת האימייל כבר בשימוש על ידי משתמש אחר' });
+      }
+    }
+
+    // עדכון הפרטים
+    const updateData = {};
+    if (name) updateData.name = name;
+    
+    // אם צריך לעדכן גם את האימייל
+    if (email && email !== req.user.email) {
+      updateData.email = email;
+    }
+
+    // עדכון המשתמש
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'המשתמש לא נמצא' });
+    }
+
+    console.log('פרופיל עודכן בהצלחה:', user._id);
+    res.json(user);
+  } catch (error) {
+    console.error('שגיאה בעדכון פרופיל:', error);
+    res.status(500).json({ message: 'שגיאת שרת בעדכון הפרופיל', details: error.message });
+  }
+};
+
 module.exports = {
   register,
-  login
+  login,
+  updateProfile
 };
