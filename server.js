@@ -18,22 +18,24 @@ app.use((req, res, next) => {
 // מגדירים את המידלוורים הבסיסיים
 app.use(cors({
   origin: 'http://localhost:3000', // הוספת origin ספציפי
-  credentials: true
-})); // מאפשר גישה מכל מקום
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+})); // מאפשר גישה מהקליינט
+
 app.use(express.json()); // מאפשר לקבל JSON בבקשות
 app.use(express.urlencoded({ extended: false })); // מאפשר לקבל נתונים מטפסים
 
-// הוספת תמיכה בCORS נוספת
-app.use(cors({
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
-}));
+// ייבוא הנתיבים
+const userRoutes = require('./routes/userRoutes');
+const postRoutes = require('./routes/postRoutes');
+const tipRoutes = require('./routes/tipRoutes');
+const groupRoutes = require('./routes/groupRoutes');
 
-// הגדרת הנתיבים הראשיים
-app.use('/api/users', require('./routes/userRoutes')); // שינוי הנתיב
-app.use('/api/posts', require('./routes/postRoutes')); // שינוי הנתיב
-app.use('/api/tips', require('./routes/tipRoutes')); // הוספת נתיב הטיפים
+// הגדרת הנתיבים הראשיים - חשוב להשתמש במשתנים ולא באובייקטים ישירות
+app.use('/api/users', userRoutes); 
+app.use('/api/posts', postRoutes);
+app.use('/api/tips', tipRoutes); 
+app.use('/api/groups', groupRoutes);
 
 // הוספת נתיב בדיקה פשוט
 app.get('/api/test', (req, res) => {
@@ -65,54 +67,6 @@ function printRoutes(stack, basePath = '') {
     }
   });
 }
-
-// הדפסה מפורטת יותר של הנתיבים
-printRoutes(app._router.stack);
-
-// להדפיס מידע על הנתיבים כדי לוודא שהוגדרו נכון
-console.log('===== נתיבי משתמשים =====');
-const userRoutes = require('./routes/userRoutes');
-userRoutes.stack.forEach((layer) => {
-  if (layer.route) {
-    const path = layer.route.path;
-    const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
-    console.log(`${methods} /api/users${path}`);
-  }
-});
-
-// הוספת endpoint לבדיקת נתיבים
-app.get('/api/routes', (req, res) => {
-  const routes = [];
-  
-  function extractRoutes(stack, basePath = '') {
-    stack.forEach(layer => {
-      if (layer.route) {
-        routes.push({
-          path: basePath + layer.route.path,
-          methods: Object.keys(layer.route.methods)
-        });
-      } else if (layer.name === 'router' && layer.handle.stack) {
-        let path = '';
-        if (layer.regexp.source !== '^\\/?(?=\\/|$)') {
-          path = layer.regexp.toString()
-            .replace('\\^', '')
-            .replace('\\/?(?=\\/|$)', '')
-            .replace('(?:\\/)?$', '')
-            .replace(/\\\//g, '/');
-          
-          if (path.includes('^')) {
-            const match = path.match(/^\/\^(\/[^\/]*)\\\/.*/);
-            if (match) path = match[1];
-          }
-        }
-        extractRoutes(layer.handle.stack, basePath + path);
-      }
-    });
-  }
-  
-  extractRoutes(app._router.stack);
-  res.json({ routes });
-});
 
 // מגדירים את הפורט והמארח
 const PORT = process.env.PORT || 5000;
